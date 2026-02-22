@@ -1,11 +1,14 @@
 import httpx
+import asyncio
 from selectolax.parser import HTMLParser
+import time
 
-def get_html(base_url, page):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
-    resp = httpx.get(base_url + str(page), headers=headers)
-    html = HTMLParser(resp.text)
-    return html
+headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+
+
+async def get_html(client, url):
+    resp = await client.get(url)
+    return HTMLParser(resp.text)
 
 def parse_page(html):
     products = html.css('li[class="max-md:border-b-size-sm max-md:border-color-default"]') # need to wrap it up because most parsers cant handle colons in the class names
@@ -30,36 +33,51 @@ def extract_text(html, sel):
 def clean_price(price_text):
     if not price_text:
         return None
-    return float(price_text.replace("£", "").replace(",", "").strip())
 
-def main():
+    price_text = price_text.replace("£", "").replace(",", "").strip()
+
+    # If it's a range like "20 - 30"
+    if "-" in price_text:
+        price_text = price_text.split("-")[0].strip()
+
+    try:
+        return float(price_text)
+    except ValueError:
+        return None
+
+async def main():
     base_url = "https://www.diy.com/painting-decorating/paint.cat?Location=Interior&page="
     
     cheapest_item = None
     cheapest_price = float("inf")
     page = 1
+    max_pages = 100
 
-    while True:
-        html = get_html(base_url, page)
-        products = parse_page(html)
+    async with httpx.AsyncClient(headers=headers, timeout=20) as client:
+        tasks = []
+        for page in range(1, max_pages + 1):
+            url = base_url + str(page)
+            tasks.append(get_html(client, url))
 
-        if not products:
-            break
+        pages = await asyncio.gather(*tasks)
 
-        for product in products:
-            price = clean_price(product["price"])
+        for html in pages:
+            products = parse_page(html)
 
-            if price and price < cheapest_price:
-                cheapest_price = price
-                cheapest_item = product
+            for product in products:
+                price = clean_price(product["price"])
 
-        page += 1
+                if price is not None and price < cheapest_price:
+                    cheapest_price = price
+                    cheapest_item = product
 
-    print("\nCheapest product found:")
-    print(cheapest_item)
-    print("Price:", cheapest_price)
+            page += 1
+
+        print("\nCheapest product found:")
+        print(cheapest_item)
+        print("Price:", cheapest_price)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 
 # https://www.diy.com/painting-decorating/paint.cat?Location=Interior&page=2
