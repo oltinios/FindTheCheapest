@@ -1,0 +1,29 @@
+body {
+  font-family: sans-serif;
+  background: #1e1e1e;
+  color: white;
+  padding: 20px;
+}
+
+#menu {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.item {
+  width: 250px;
+  padding: 15px;
+  background: #2c2c2c;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.3s;
+  align-items: center;
+}
+
+.item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px #ddd;
+}
